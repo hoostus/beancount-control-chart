@@ -103,7 +103,7 @@ def get_networth(entries, options_map, args):
         # TODO: How can something have a book_value but not a market_value?
         value = holdings_list[0].market_value or holdings_list[0].book_value
         net_worths.append((date, float(value)))
-        logging.info("{}: {:,.2f}".format(date, value))
+        logging.debug("{}: {:,.2f}".format(date, value))
 
     return pandas.Series(dict(net_worths))
 
@@ -139,7 +139,7 @@ def build_dataframe(args):
 
 def chart(df, args):
     df['date'] = df.index
-    df['upper control limit'] = 0.0297
+    df['upper control limit'] = args.upper_control_limit
     melted = df.melt(id_vars='date')
     stdev = df['monthly spending rate'].std()
 
