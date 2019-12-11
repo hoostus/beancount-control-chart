@@ -145,17 +145,18 @@ def chart(df, args):
     melted = df.melt(id_vars='date')
     stdev = df['monthly spending rate'].std()
 
-#    matplotlib.rcParams['font.family'] = 'League Spartan'
+    matplotlib.rcParams['font.family'] = 'League Spartan'
     a4_dims = (11.7, 8.27)
     fig, ax = plt.subplots(figsize=a4_dims)
-    seaborn.lineplot(ax=ax, x='date', y='value', hue='variable', data=melted)
+    seaborn.set_context(rc={"lines.linewidth": 2.5})
+    seaborn.lineplot(ax=ax, x='date', y='value', hue='variable', data=melted, palette='Set2')
     seaborn.despine(ax=ax, left=True, bottom=True, offset=20) 
     plt.xticks(rotation=45)
     # add in stdevs, leave it 1 stdev for now but consider using 2stdevs in future
     plt.fill_between(df.index,
             df['moving average'] - stdev,
             df['moving average'] + stdev,
-            alpha=0.6)
+            alpha=0.2)
     ax.set_ylim(bottom=0)
     plt.title('Spending Process Control Chart')
 
