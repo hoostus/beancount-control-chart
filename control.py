@@ -45,7 +45,9 @@ def parse_args():
     parser.add_argument('--ignore-account', action='append', default=[])
     parser.add_argument('--currency', help="Currency to report in")
     parser.add_argument('--upper-control-limit', type=float, default=0.05, help="The upper threshold for spending (as an annual percentage of assets)")
+    parser.add_argument('--control-limit', nargs=2, action='append', help="Define a new control limit with a name and a value. e.g. --control-limit danger 0.05")
     parser.add_argument('--output', default='process-chart.png', help="The filename to write the graph to")
+    parser.add_argument('--display', default=False, action='store_true', help='Display the chart instead of saving it to a file')
 
     parser.add_argument('filename', help='Beancount input filename')
     args = parser.parse_args()
@@ -157,22 +159,12 @@ def chart(df, args):
     ax.set_ylim(bottom=0)
     plt.title('Spending Process Control Chart')
 
-    fig.savefig(args.output)
-#    plt.show()
-
-def upload_to_gdrive():
-    from pydrive.auth import GoogleAuth
-    from pydrive.drive import GoogleDrive
-    gauth = GoogleAuth()
-    gauth.LocalWebserverAuth()
-    drive = GoogleDrive(gauth)
-    #file_list = drive.ListFile({'q': "title = 'Retirement Process Control.png' and trashed=false"}).GetList()
-    file_list = drive.ListFile({'q': "'root' in parents and trashed=false"}).GetList()
-    for file1 in file_list:
-        print('title: %s, id: %s' % (file1['title'], file1['id']))
+    if args.display:
+        plt.show()
+    else:
+        fig.savefig(args.output)
 
 if __name__ == '__main__':
     args = parse_args()
     df = build_dataframe(args)
     chart(df, args)
-#    upload_to_gdrive()
