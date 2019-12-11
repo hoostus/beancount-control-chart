@@ -44,7 +44,6 @@ def parse_args():
                         help="Minimum date")
     parser.add_argument('--ignore-account', action='append', default=[])
     parser.add_argument('--currency', help="Currency to report in")
-    parser.add_argument('--upper-control-limit', type=float, default=0.05, help="The upper threshold for spending (as an annual percentage of assets)")
     parser.add_argument('--control-limit', nargs=2, action='append', help="Define a new control limit with a name and a value. e.g. --control-limit danger 0.05")
     parser.add_argument('--output', default='process-chart.png', help="The filename to write the graph to")
     parser.add_argument('--display', default=False, action='store_true', help='Display the chart instead of saving it to a file')
@@ -141,7 +140,11 @@ def build_dataframe(args):
 
 def chart(df, args):
     df['date'] = df.index
-    df['upper control limit'] = args.upper_control_limit
+
+    # define all of the control limits.
+    for (name, value) in args.control_limit:
+        df[name] = float(value)
+
     melted = df.melt(id_vars='date')
     stdev = df['monthly spending rate'].std()
 
