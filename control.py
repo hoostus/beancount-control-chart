@@ -47,6 +47,7 @@ def parse_args():
     parser.add_argument('--control-limit', nargs=2, action='append', help="Define a new control limit with a name and a value. e.g. --control-limit danger 0.05")
     parser.add_argument('--output', default='process-chart.png', help="The filename to write the graph to")
     parser.add_argument('--display', default=False, action='store_true', help='Display the chart instead of saving it to a file')
+    parser.add_argument('--rolling', default=12, type=int, help='How many months to use when calculating the rolling average.')
 
     parser.add_argument('filename', help='Beancount input filename')
     args = parser.parse_args()
@@ -131,7 +132,7 @@ def build_dataframe(args):
     combined_df = pandas.concat([spending_series, networth_series], axis=1, sort=False)
     # we convert the monthly rate to an annual one by multiplying by 12
     spending_rate = (combined_df[0] * 12) / (combined_df[1])
-    moving_average = (combined_df[0].rolling(12).mean() * 12) / combined_df[1].rolling(12).mean()
+    moving_average = (combined_df[0].rolling(args.rolling).mean() * 12) / combined_df[1].rolling(args.rolling).mean()
 
     df = pandas.concat([spending_rate, moving_average], axis=1, sort=False)
     df.columns = ['monthly spending rate', 'moving average']
@@ -153,6 +154,7 @@ def chart(df, args):
     fig, ax = plt.subplots(figsize=a4_dims)
     seaborn.set_context(rc={"lines.linewidth": 2.5})
     seaborn.lineplot(ax=ax, x='date', y='value', hue='variable', data=melted, palette='Set2')
+    
     seaborn.despine(ax=ax, left=True, bottom=True, offset=20) 
     plt.xticks(rotation=45)
     # add in stdevs, leave it 1 stdev for now but consider using 2stdevs in future
