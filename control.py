@@ -138,11 +138,13 @@ def build_dataframe(args):
     df.columns = ['monthly spending rate', 'moving average']
 
     # define all of the control limits.
-    for (name, value) in args.control_limit:
-        df[name] = float(value)
+    if args.control_limit:
+        for (name, value) in args.control_limit:
+            df[name] = float(value)
 
-    for (name, value) in args.control_limit_absolute:
-        df[name] = float(value) / networth_series
+    if args.control_limit_absolute:
+        for (name, value) in args.control_limit_absolute:
+            df[name] = float(value) / networth_series
 
     return df
 
@@ -166,7 +168,10 @@ def chart(df, args):
             df['moving average'],
             df['moving average'] + stdev,
             alpha=0.2)
-    ax.set_ylim(bottom=0)
+
+    if melted.value.all() > 0:
+        ax.set_ylim(bottom=0)
+
     plt.title('Spending Process Control Chart')
 
     if args.display:
