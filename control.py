@@ -138,11 +138,13 @@ def build_dataframe(args):
     df.columns = ['monthly spending rate', 'moving average']
 
     # define all of the control limits.
-    for (name, value) in args.control_limit:
-        df[name] = float(value)
+    if args.control_limit:
+        for (name, value) in args.control_limit:
+            df[name] = float(value)
 
-    for (name, value) in args.control_limit_absolute:
-        df[name] = float(value) / networth_series
+    if args.control_limit_absolute:
+        for (name, value) in args.control_limit_absolute:
+            df[name] = float(value) / networth_series
 
     return df
 
