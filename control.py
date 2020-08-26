@@ -22,7 +22,6 @@ import seaborn
 from beancount.core import data
 from beancount.ops import holdings
 from beancount import loader
-from beancount.reports import holdings_reports
 from beancount.query import query
 
 QUERY = """
@@ -80,7 +79,7 @@ def get_networth(entries, options_map, args):
             index += 1
 
         # Get the list of holdings.
-        raw_holdings_list, price_map = holdings_reports.get_assets_holdings(current_entries,
+        raw_holdings_list, price_map = holdings.get_assets_holdings(current_entries,
                                                                             options_map)
 
         # Remove any accounts we don't in our final total
