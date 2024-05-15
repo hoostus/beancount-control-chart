@@ -2,10 +2,8 @@
 
 """ Calculate monthly net worth """
 
-import collections
 import datetime
 import logging
-import time
 import argparse
 import logging
 
@@ -24,6 +22,10 @@ from beancount.ops import holdings
 from beancount import loader
 from beancount.query import query
 
+# the entry_meta uuid is a way to ignore a single, massive outlier
+# transaction that is messing up the entire chart
+# need to think of a better way to handle this...
+
 QUERY = """
 SELECT
 	year(date) AS year,
@@ -31,11 +33,12 @@ SELECT
         convert(sum(cost(position)), 'USD') AS balance
 WHERE
         account ~ 'Expenses:' AND
-        account != 'Expenses:Tax'
+        account != 'Expenses:Tax' AND
+        ENTRY_META("uuid") != '95827ea8-a6ec-4fee-b809-bf05ed5486a2'
 """
 
 def parse_args():
-    logging.basicConfig(level=logging.INFO, format='%(levelname)-8s: %(message)s')
+    logging.basicConfig(level=logging.ERROR, format='%(levelname)-8s: %(message)s')
     parser = argparse.ArgumentParser(description=__doc__.strip())
 
     parser.add_argument('--min-date', action='store',
@@ -48,6 +51,7 @@ def parse_args():
     parser.add_argument('--output', default='process-chart.png', help="The filename to write the graph to")
     parser.add_argument('--display', default=False, action='store_true', help='Display the chart instead of saving it to a file')
     parser.add_argument('--rolling', default=12, type=int, help='How many months to use when calculating the rolling average.')
+    #parser.add_argument('--verbose')
 
     parser.add_argument('filename', help='Beancount input filename')
     args = parser.parse_args()
@@ -151,23 +155,26 @@ def build_dataframe(args):
 def chart(df, args):
     df['date'] = df.index
 
-    melted = df.melt(id_vars='date')
-    stdev = df['monthly spending rate'].std()
+    # We really only care about recent spending trends
+    # so trim off all but the last 6-9-12 months
+    # (Not sure what the right cut off is.)
+    melted = df[-12:].melt(id_vars='date')
 
     matplotlib.rcParams['font.family'] = 'League Spartan'
     a4_dims = (11.7, 8.27)
     fig, ax = plt.subplots(figsize=a4_dims)
     seaborn.set_context(rc={"lines.linewidth": 2.5})
     seaborn.lineplot(ax=ax, x='date', y='value', hue='variable', data=melted, palette='Set2')
-    
     seaborn.despine(ax=ax, left=True, bottom=True, offset=20) 
     plt.xticks(rotation=45)
+
     # add in stdevs, leave it 1 stdev for now but consider using 2stdevs in future.
     # we really only care about upward variance (i.e. more spending that expected)
-    plt.fill_between(df.index,
-            df['moving average'],
-            df['moving average'] + stdev,
-            alpha=0.2)
+    #stdev = df['monthly spending rate'].std()
+    #plt.fill_between(df.index,
+    #        df['moving average'],
+    #        df['moving average'] + stdev,
+    #        alpha=0.2)
 
     if melted.value.all() > 0:
         ax.set_ylim(bottom=0)
