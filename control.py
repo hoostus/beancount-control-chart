@@ -18,24 +18,8 @@ import matplotlib
 import seaborn
 
 from beancount.core import data
-from beancount.ops import holdings
 from beancount import loader
-from beancount.query import query
-
-# the entry_meta uuid is a way to ignore a single, massive outlier
-# transaction that is messing up the entire chart
-# need to think of a better way to handle this...
-
-QUERY = """
-SELECT
-	year(date) AS year,
-        month(date) AS month,
-        convert(sum(cost(position)), 'USD') AS balance
-WHERE
-        account ~ 'Expenses:' AND
-        account != 'Expenses:Tax' AND
-        ENTRY_META("uuid") != '95827ea8-a6ec-4fee-b809-bf05ed5486a2'
-"""
+from beanquery import query
 
 def parse_args():
     logging.basicConfig(level=logging.ERROR, format='%(levelname)-8s: %(message)s')
@@ -58,8 +42,27 @@ def parse_args():
     return args
 
 def get_spending(entries, options_map, min_date):
-    query_rows = query.run_query(entries, options_map, QUERY, numberify=True)
-    spending = [(datetime.date(n[0], n[1], 1), float(n[2])) for n in query_rows[1]]
+    # the entry_meta uuid is a way to ignore a single, massive outlier
+    # transaction that is messing up the entire chart
+    # need to think of a better way to handle this...
+
+    spending_query = """
+    SELECT
+        year,
+        month,
+        convert(sum(cost(position)), 'USD') AS amount
+    WHERE
+        account ~ 'Expenses:'
+    """
+
+    query_types, query_rows = query.run_query(entries, options_map, spending_query)
+    def get_float(n):
+        pos = n.get_only_position()
+        if pos == None:
+            return 0
+        else:
+            return float(pos.units.number)
+    spending = [(datetime.date(n[0], n[1], 1), get_float(n[2])) for n in query_rows]
     filtered = [n for n in spending if n[0] >= min_date]
     return pandas.Series(dict(filtered))
 
@@ -72,44 +75,29 @@ def get_networth(entries, options_map, args):
     period = rrule.rrule(rrule.MONTHLY, bymonthday=1, dtstart=args.min_date, until=dtend)
 
     for dtime in period:
-        date = dtime.date()
+        target_date = dtime.date()
+        currency = 'USD'
 
-        # Append new entries until the given date.
-        while True:
-            entry = entries[index]
-            if entry.date >= date:
-                break
-            current_entries.append(entry)
-            index += 1
+        networth_query = f"""
+            SELECT account, convert(SUM(position),'{currency}',{target_date}) as amount
+            where date <= {target_date} AND account ~ 'Assets|Liabilities'
+        """
 
-        # Get the list of holdings.
-        raw_holdings_list, price_map = holdings.get_assets_holdings(current_entries,
-                                                                            options_map)
+        rtypes, rrows = query.run_query(entries, options_map, networth_query)
+        value = 0
+        for row in rrows:
+            inventory = row[1]
+            position = inventory.get_only_position()
+            if position != None:
+                value += position.units.number
 
-        # Remove any accounts we don't in our final total
-        filtered_holdings_list = [n for n in raw_holdings_list if n.account not in args.ignore_account]
+        #INCOME_STATEMENT_QUERY = f"""
+        #        SELECT account, sum(convert(position, 'EUR', date)) as amount
+        #        WHERE account ~ 'Expenses|Income' and date >= {date_a} and date <= {date_b}
+        #        """
 
-        # Convert the currencies.
-        holdings_list = holdings.convert_to_currency(price_map,
-                                                        args.currency,
-                                                        filtered_holdings_list)
-
-        holdings_list = holdings.aggregate_holdings_by(
-            holdings_list, lambda holding: holding.cost_currency)
-
-        holdings_list = [holding
-                            for holding in holdings_list
-                            if holding.currency and holding.cost_currency]
-
-        # If after conversion there are no valid holdings, skip the currency
-        # altogether.
-        if not holdings_list:
-            continue
-
-        # TODO: How can something have a book_value but not a market_value?
-        value = holdings_list[0].market_value or holdings_list[0].book_value
-        net_worths.append((date, float(value)))
-        logging.debug("{}: {:,.2f}".format(date, value))
+        net_worths.append((target_date, float(value)))
+        logging.debug("{}: {:,.2f}".format(target_date, value))
 
     return pandas.Series(dict(net_worths))
 
